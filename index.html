@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Etsy Manager Pro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0d0d0d; --surface: #161616; --surface2: #1e1e1e;
+    --border: #2a2a2a; --etsy: #F1641E; --etsy-dim: rgba(241,100,30,0.15);
+    --green: #3ddc84; --green-dim: rgba(61,220,132,0.12);
+    --yellow: #f5c842; --red: #ff5555;
+    --text: #f0ede8; --text-muted: #666; --text-dim: #999;
+    --mono: 'DM Mono', monospace; --sans: 'Syne', sans-serif;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; overflow-x: hidden; }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(241,100,30,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(241,100,30,0.03) 1px, transparent 1px);
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
+  }
+  #root { position: relative; z-index: 1; }
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 32px; border-bottom: 1px solid var(--border);
+    background: rgba(13,13,13,0.95); backdrop-filter: blur(12px);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 20px; letter-spacing: -0.5px; }
+  .logo-badge { background: var(--etsy); color: white; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .status-text { font-family: var(--mono); font-size: 11px; color: var(--text-dim); letter-spacing: 0.5px; }
+  .nav { display: flex; gap: 2px; padding: 16px 32px 0; border-bottom: 1px solid var(--border); }
+  .nav-tab {
+    padding: 10px 20px; font-family: var(--sans); font-weight: 600; font-size: 13px;
+    letter-spacing: 0.5px; color: var(--text-muted); cursor: pointer; border: none;
+    background: transparent; border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: all 0.15s; text-transform: uppercase;
+  }
+  .nav-tab:hover { color: var(--text-dim); }
+  .nav-tab.active { color: var(--etsy); border-bottom-color: var(--etsy); }
+  .main { padding: 28px 32px; }
+  .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 28px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; position: relative; overflow: hidden; }
+  .stat-card::before { content:''; position:absolute; top:0;left:0;right:0; height:2px; background:var(--etsy); opacity:0.6; }
+  .stat-label { font-family: var(--mono); font-size: 10px; color: var(--text-muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
+  .stat-value { font-size: 28px; font-weight: 800; letter-spacing: -1px; }
+  .stat-sub { font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+  .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .search-box { flex:1; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:10px 14px; font-family:var(--mono); font-size:13px; color:var(--text); outline:none; transition:border-color 0.15s; }
+  .search-box:focus { border-color: var(--etsy); }
+  .search-box::placeholder { color: var(--text-muted); }
+  .btn { padding:10px 18px; border-radius:6px; font-family:var(--sans); font-weight:700; font-size:12px; letter-spacing:0.5px; cursor:pointer; border:none; transition:all 0.15s; text-transform:uppercase; white-space:nowrap; }
+  .btn-primary { background:var(--etsy); color:white; }
+  .btn-primary:hover { background:#d4551a; }
+  .btn-outline { background:transparent; border:1px solid var(--border); color:var(--text-dim); }
+  .btn-outline:hover { border-color:var(--etsy); color:var(--etsy); }
+  .btn-green { background:var(--green-dim); border:1px solid var(--green); color:var(--green); }
+  .btn-green:hover { background:rgba(61,220,132,0.2); }
+  .btn-sm { padding:6px 12px; font-size:11px; }
+  .table-wrap { background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+  table { width:100%; border-collapse:collapse; }
+  thead { background:var(--surface2); border-bottom:1px solid var(--border); }
+  th { padding:12px 16px; font-family:var(--mono); font-size:10px; color:var(--text-muted); letter-spacing:1.5px; text-transform:uppercase; text-align:left; font-weight:500; }
+  td { padding:14px 16px; border-bottom:1px solid var(--border); font-size:13px; vertical-align:middle; }
+  tr:last-child td { border-bottom:none; }
+  tr:hover td { background:rgba(241,100,30,0.03); }
+  .listing-title { font-weight:600; font-size:13px; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .listing-id { font-family:var(--mono); font-size:10px; color:var(--text-muted); margin-top:2px; }
+  .price { font-family:var(--mono); font-weight:500; color:var(--green); }
+  .qty-input { width:64px; background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:6px 8px; font-family:var(--mono); font-size:13px; color:var(--text); text-align:center; outline:none; }
+  .qty-input:focus { border-color:var(--etsy); }
+  .badge { display:inline-flex; align-items:center; padding:3px 8px; border-radius:3px; font-family:var(--mono); font-size:10px; font-weight:500; letter-spacing:0.5px; text-transform:uppercase; }
+  .badge-active { background:var(--green-dim); color:var(--green); border:1px solid rgba(61,220,132,0.3); }
+  .badge-inactive { background:rgba(255,85,85,0.1); color:var(--red); border:1px solid rgba(255,85,85,0.3); }
+  .badge-draft { background:rgba(245,200,66,0.1); color:var(--yellow); border:1px solid rgba(245,200,66,0.3); }
+  .setup-screen { max-width:560px; margin:60px auto; text-align:center; }
+  .setup-icon { font-size:48px; margin-bottom:16px; }
+  .setup-screen h2 { font-size:28px; font-weight:800; letter-spacing:-1px; margin-bottom:8px; }
+  .setup-screen p { color:var(--text-dim); font-size:14px; line-height:1.6; margin-bottom:32px; }
+  .setup-form { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:28px; text-align:left; }
+  .form-group { margin-bottom:16px; }
+  .form-label { display:block; font-family:var(--mono); font-size:11px; color:var(--text-muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:6px; }
+  .form-input { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:12px 14px; font-family:var(--mono); font-size:13px; color:var(--text); outline:none; transition:border-color 0.15s; }
+  .form-input:focus { border-color:var(--etsy); }
+  .form-hint { font-family:var(--mono); font-size:10px; color:var(--text-muted); margin-top:4px; }
+  .bulk-section { max-width:800px; }
+  .bulk-section h3 { font-size:18px; font-weight:700; margin-bottom:20px; letter-spacing:-0.5px; }
+  .bulk-row { display:grid; grid-template-columns:2fr 1fr 1fr 1fr auto; gap:10px; margin-bottom:10px; align-items:center; }
+  .bulk-row-header { font-family:var(--mono); font-size:10px; color:var(--text-muted); letter-spacing:1px; text-transform:uppercase; padding:0 4px; }
+  .bulk-input { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:10px 12px; font-family:var(--mono); font-size:12px; color:var(--text); outline:none; transition:border-color 0.15s; width:100%; }
+  .bulk-input:focus { border-color:var(--etsy); }
+  .remove-btn { background:transparent; border:1px solid var(--border); color:var(--red); width:32px; height:32px; border-radius:4px; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:all 0.15s; }
+  .remove-btn:hover { background:rgba(255,85,85,0.1); border-color:var(--red); }
+  .toast { position:fixed; bottom:24px; right:24px; background:var(--surface2); border:1px solid var(--border); border-left:3px solid var(--green); border-radius:8px; padding:14px 20px; font-family:var(--mono); font-size:13px; color:var(--text); z-index:300; animation:slideIn 0.2s ease; }
+  @keyframes slideIn { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+  .spinner { display:inline-block; width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--etsy); border-radius:50%; animation:spin 0.6s linear infinite; margin-right:8px; vertical-align:middle; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .empty-state { text-align:center; padding:60px 20px; color:var(--text-muted); }
+  .empty-state .icon { font-size:40px; margin-bottom:12px; }
+  .section-title { font-size:22px; font-weight:800; letter-spacing:-0.5px; margin-bottom:20px; }
+  .info-box { background:var(--etsy-dim); border:1px solid rgba(241,100,30,0.3); border-radius:8px; padding:14px 18px; font-family:var(--mono); font-size:12px; color:var(--text-dim); line-height:1.7; margin-bottom:20px; }
+  .info-box strong { color:var(--etsy); }
+  .step-box { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px 20px; margin-bottom:12px; display:flex; gap:14px; align-items:flex-start; }
+  .step-num { background:var(--etsy); color:white; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; margin-top:1px; }
+  .step-content { flex:1; }
+  .step-title { font-weight:700; font-size:14px; margin-bottom:4px; }
+  .step-desc { font-family:var(--mono); font-size:12px; color:var(--text-dim); line-height:1.6; }
+  .code { background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:2px 6px; font-family:var(--mono); font-size:12px; color:var(--etsy); }
+  @media(max-width:768px) { .stats-row{grid-template-columns:repeat(2,1fr)} .main{padding:16px} .header{padding:14px 16px} .nav{padding:12px 16px 0} .bulk-row{grid-template-columns:1fr 1fr} }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const STORAGE_KEY = 'etsy_mgr_v1';
+const ETSY_API_KEY = 'yspyf6n6947nnvsozogmenvd'; // your keystring
+
+function loadCfg() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; } }
+function saveCfg(c) { localStorage.setItem(STORAGE_KEY, JSON.stringify(c)); }
+
+async function etsyGet(path, token) {
+  const r = await fetch(`https://openapi.etsy.com/v3${path}`, {
+    headers: { 'Authorization': `Bearer ${token}`, 'x-api-key': ETSY_API_KEY }
+  });
+  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error_description||e.error||`HTTP ${r.status}`); }
+  return r.json();
+}
+async function etsyPut(path, token, body) {
+  const r = await fetch(`https://openapi.etsy.com/v3${path}`, {
+    method: 'PUT',
+    headers: { 'Authorization': `Bearer ${token}`, 'x-api-key': ETSY_API_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error_description||e.error||`HTTP ${r.status}`); }
+  return r.json();
+}
+async function etsyPost(path, token, body) {
+  const r = await fetch(`https://openapi.etsy.com/v3${path}`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'x-api-key': ETSY_API_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error_description||e.error||`HTTP ${r.status}`); }
+  return r.json();
+}
+
+function genVerifier() {
+  const a = new Uint8Array(32); crypto.getRandomValues(a);
+  return btoa(String.fromCharCode(...a)).replace(/[^a-zA-Z0-9]/g,'').slice(0,43);
+}
+async function genChallenge(v) {
+  const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v));
+  return btoa(String.fromCharCode(...new Uint8Array(h))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+}
+
+function emptyRow() { return { id: Date.now()+Math.random(), title:'', price:'', qty:'', sku:'' }; }
+
+function App() {
+  const [cfg, setCfg] = useState(loadCfg);
+  const [tab, setTab] = useState('listings');
+  const [listings, setListings] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [toast, setToast] = useState('');
+  const [editQtys, setEditQtys] = useState({});
+  const [bulkRows, setBulkRows] = useState([emptyRow()]);
+  const [csvText, setCsvText] = useState('');
+
+  function showToast(m) { setToast(m); setTimeout(()=>setToast(''),3500); }
+
+  function updateCfg(updates) {
+    const n = {...cfg,...updates}; saveCfg(n); setCfg(n);
+  }
+
+  // OAuth
+  async function startOAuth() {
+    const v = genVerifier();
+    const ch = await genChallenge(v);
+    sessionStorage.setItem('pkce_v', v);
+    const redirect = window.location.origin + window.location.pathname;
+    const scopes = 'listings_r listings_w transactions_r';
+    window.location.href = `https://www.etsy.com/oauth/connect?response_type=code&redirect_uri=${encodeURIComponent(redirect)}&scope=${encodeURIComponent(scopes)}&client_id=${ETSY_API_KEY}&state=auth&code_challenge=${ch}&code_challenge_method=S256`;
+  }
+
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const code = p.get('code');
+    if (!code) return;
+    (async () => {
+      try {
+        const v = sessionStorage.getItem('pkce_v');
+        const redirect = window.location.origin + window.location.pathname;
+        const r = await fetch('/api/token', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ code, code_verifier: v, redirect_uri: redirect })
+        });
+        const data = await r.json();
+        if (data.access_token) {
+          updateCfg({ accessToken: data.access_token, refreshToken: data.refresh_token });
+          sessionStorage.removeItem('pkce_v');
+          window.history.replaceState({}, '', window.location.pathname);
+          showToast('✓ Connected to Etsy!');
+        } else { showToast('✗ Auth failed: ' + (data.error||'unknown')); }
+      } catch(e) { showToast('✗ ' + e.message); }
+    })();
+  }, []);
+
+  // Fetch listings
+  async function fetchListings() {
+    if (!cfg.accessToken) return;
+    setLoading(true);
+    try {
+      let sid = cfg.shopId;
+      if (!sid) {
+        const me = await etsyGet('/application/users/me', cfg.accessToken);
+        const shop = await etsyGet(`/application/users/${me.user_id}/shops`, cfg.accessToken);
+        sid = shop.shop_id;
+        updateCfg({ shopId: sid });
+      }
+      const data = await etsyGet(`/application/shops/${sid}/listings/active?limit=100`, cfg.accessToken);
+      setListings(data.results || []);
+    } catch(e) { showToast('✗ ' + e.message); }
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    if (cfg.accessToken && tab === 'listings') fetchListings();
+  }, [cfg.accessToken, tab]);
+
+  async function saveQty(l) {
+    const qty = parseInt(editQtys[l.listing_id]);
+    if (isNaN(qty)) return;
+    try {
+      await etsyPut(`/application/shops/${cfg.shopId}/listings/${l.listing_id}`, cfg.accessToken, { quantity: qty });
+      setListings(p => p.map(x => x.listing_id===l.listing_id ? {...x,quantity:qty} : x));
+      setEditQtys(p => { const n={...p}; delete n[l.listing_id]; return n; });
+      showToast('✓ Quantity updated');
+    } catch(e) { showToast('✗ '+e.message); }
+  }
+
+  function exportCSV() {
+    const rows = [
+      ['Listing ID','Title','Price','Quantity','Status','URL'],
+      ...listings.map(l => [
+        l.listing_id,
+        `"${(l.title||'').replace(/"/g,'""')}"`,
+        ((l.price?.amount||0)/(l.price?.divisor||100)).toFixed(2),
+        l.quantity||0, l.state||'',
+        `https://www.etsy.com/listing/${l.listing_id}`
+      ])
+    ];
+    const csv = rows.map(r=>r.join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    a.download = `etsy-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    showToast('✓ CSV ready — drag into Google Sheets!');
+  }
+
+  async function submitBulk() {
+    const valid = bulkRows.filter(r=>r.title&&r.price);
+    if (!valid.length || !cfg.accessToken || !cfg.shopId) { showToast('Fill in listings and connect Etsy first'); return; }
+    setLoading(true);
+    let ok=0;
+    for (const row of valid) {
+      try {
+        await etsyPost(`/application/shops/${cfg.shopId}/listings`, cfg.accessToken, {
+          title: row.title, description: row.title,
+          price: parseFloat(row.price), quantity: parseInt(row.qty)||1,
+          who_made:'i_did', when_made:'2020_2024', taxonomy_id:1,
+          is_taxable:true, is_supply:false,
+          ...(row.sku ? {sku:[row.sku]} : {})
+        });
+        ok++;
+      } catch(e) { console.error(row.title, e.message); }
+    }
+    setLoading(false);
+    setBulkRows([emptyRow()]);
+    showToast(`✓ Created ${ok} listing${ok!==1?'s':''}`);
+    if (tab==='listings') fetchListings();
+  }
+
+  function parseCsv() {
+    const rows = csvText.trim().split('\n').filter(Boolean).map(line => {
+      const [title='',price='',qty='',sku=''] = line.split(',').map(s=>s.trim().replace(/^"|"$/g,''));
+      return {...emptyRow(),title,price,qty,sku};
+    });
+    if (rows.length) { setBulkRows(rows); showToast(`✓ Parsed ${rows.length} rows`); setCsvText(''); }
+  }
+
+  const filtered = listings.filter(l => !search||(l.title||'').toLowerCase().includes(search.toLowerCase()));
+  const isConnected = !!cfg.accessToken;
+
+  return (
+    <>
+      <header className="header">
+        <div className="logo"><span className="logo-badge">ETSY</span> Manager Pro</div>
+        <div className="header-right">
+          {isConnected && <div className="status-dot"/>}
+          <span className="status-text">{isConnected?'CONNECTED':'NOT CONNECTED'}</span>
+          {!isConnected && <button className="btn btn-primary btn-sm" onClick={startOAuth}>Connect Etsy →</button>}
+        </div>
+      </header>
+
+      <nav className="nav">
+        {[['listings','📦 Listings'],['bulk','➕ Bulk Add'],['settings','⚙️ Settings']].map(([id,label])=>(
+          <button key={id} className={`nav-tab ${tab===id?'active':''}`} onClick={()=>setTab(id)}>{label}</button>
+        ))}
+      </nav>
+
+      <main className="main">
+        {/* LISTINGS */}
+        {tab==='listings' && (
+          <>
+            {!isConnected ? (
+              <div className="setup-screen">
+                <div className="setup-icon">🛍️</div>
+                <h2>Connect Your Etsy Shop</h2>
+                <p>Click the button to authorize this app with your Etsy account. You'll be redirected back automatically.</p>
+                <button className="btn btn-primary" style={{width:'100%',padding:'16px'}} onClick={startOAuth}>Connect to Etsy →</button>
+              </div>
+            ) : (
+              <>
+                <div className="stats-row">
+                  {[
+                    ['Total Listings', listings.length, 'active in shop'],
+                    ['Total Inventory', listings.reduce((s,l)=>s+(l.quantity||0),0), 'units across all'],
+                    ['Avg Price', listings.length?'$'+(listings.reduce((s,l)=>s+((l.price?.amount||0)/(l.price?.divisor||100)),0)/listings.length).toFixed(2):'$0.00','per listing'],
+                    ['Low Stock', listings.filter(l=>(l.quantity||0)<3).length, 'under 3 units'],
+                  ].map(([label,val,sub])=>(
+                    <div className="stat-card" key={label}>
+                      <div className="stat-label">{label}</div>
+                      <div className="stat-value" style={label==='Low Stock'&&parseInt(val)>0?{color:'var(--yellow)'}:{}}>{val}</div>
+                      <div className="stat-sub">{sub}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="toolbar">
+                  <input className="search-box" placeholder="Search listings..." value={search} onChange={e=>setSearch(e.target.value)}/>
+                  <button className="btn btn-outline" onClick={fetchListings}>↻ Refresh</button>
+                  <button className="btn btn-green" onClick={exportCSV}>↓ Export CSV</button>
+                </div>
+                <div className="table-wrap">
+                  <table>
+                    <thead><tr><th>Listing</th><th>Price</th><th>Quantity</th><th>Status</th><th>Actions</th></tr></thead>
+                    <tbody>
+                      {loading ? (
+                        <tr><td colSpan="5" style={{textAlign:'center',padding:'40px',fontFamily:'var(--mono)',fontSize:'13px',color:'var(--text-muted)'}}><span className="spinner"/>Loading...</td></tr>
+                      ) : filtered.length===0 ? (
+                        <tr><td colSpan="5"><div className="empty-state"><div className="icon">📦</div><p>{listings.length===0?'Click Refresh to load your listings.':'No matches.'}</p></div></td></tr>
+                      ) : filtered.map(l=>{
+                        const price = ((l.price?.amount||0)/(l.price?.divisor||100)).toFixed(2);
+                        const isDirty = editQtys[l.listing_id]!==undefined;
+                        const qty = isDirty ? editQtys[l.listing_id] : (l.quantity||0);
+                        return (
+                          <tr key={l.listing_id}>
+                            <td><div className="listing-title">{l.title}</div><div className="listing-id">#{l.listing_id}</div></td>
+                            <td><span className="price">${price}</span></td>
+                            <td><input className="qty-input" type="number" min="0" value={qty} onChange={e=>setEditQtys(p=>({...p,[l.listing_id]:e.target.value}))}/></td>
+                            <td><span className={`badge badge-${l.state==='active'?'active':l.state==='draft'?'draft':'inactive'}`}>{l.state||'active'}</span></td>
+                            <td>
+                              <div style={{display:'flex',gap:'6px'}}>
+                                {isDirty && <button className="btn btn-green btn-sm" onClick={()=>saveQty(l)}>Save</button>}
+                                <a href={`https://www.etsy.com/listing/${l.listing_id}`} target="_blank" className="btn btn-outline btn-sm" style={{textDecoration:'none'}}>View</a>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {/* BULK ADD */}
+        {tab==='bulk' && (
+          <div className="bulk-section">
+            <div className="section-title">Bulk Add Listings</div>
+            <div className="info-box">Fill rows manually <strong>or</strong> paste CSV below and click Parse. Then hit <strong>Submit All</strong>.</div>
+            <div className="bulk-row" style={{marginBottom:'4px'}}>
+              {['Title *','Price ($) *','Qty','SKU',''].map((h,i)=><div key={i} className="bulk-row-header">{h}</div>)}
+            </div>
+            {bulkRows.map((row,i)=>(
+              <div className="bulk-row" key={row.id}>
+                <input className="bulk-input" placeholder="Product title..." value={row.title} onChange={e=>setBulkRows(p=>p.map((r,j)=>j===i?{...r,title:e.target.value}:r))}/>
+                <input className="bulk-input" type="number" placeholder="9.99" value={row.price} onChange={e=>setBulkRows(p=>p.map((r,j)=>j===i?{...r,price:e.target.value}:r))}/>
+                <input className="bulk-input" type="number" placeholder="1" value={row.qty} onChange={e=>setBulkRows(p=>p.map((r,j)=>j===i?{...r,qty:e.target.value}:r))}/>
+                <input className="bulk-input" placeholder="SKU-001" value={row.sku} onChange={e=>setBulkRows(p=>p.map((r,j)=>j===i?{...r,sku:e.target.value}:r))}/>
+                <button className="remove-btn" onClick={()=>setBulkRows(p=>p.filter((_,j)=>j!==i))}>×</button>
+              </div>
+            ))}
+            <div style={{display:'flex',gap:'10px',marginTop:'16px'}}>
+              <button className="btn btn-outline" onClick={()=>setBulkRows(p=>[...p,emptyRow()])}>+ Add Row</button>
+              <button className="btn btn-primary" onClick={submitBulk} disabled={loading}>
+                {loading?'Creating...':`Submit All (${bulkRows.filter(r=>r.title&&r.price).length} ready)`}
+              </button>
+            </div>
+            <div style={{marginTop:'28px',padding:'20px',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'8px'}}>
+              <div className="form-label" style={{marginBottom:'8px'}}>📋 Paste CSV from Google Sheets</div>
+              <textarea value={csvText} onChange={e=>setCsvText(e.target.value)}
+                style={{width:'100%',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'6px',padding:'10px',fontFamily:'var(--mono)',fontSize:'12px',color:'var(--text)',outline:'none',minHeight:'80px',resize:'vertical'}}
+                placeholder={"Blue Ceramic Mug,12.99,5,MUG-001\nSilk Scrunchie,4.50,20,SCR-002"}/>
+              <button className="btn btn-outline" style={{marginTop:'10px'}} onClick={parseCsv}>Parse CSV →</button>
+            </div>
+          </div>
+        )}
+
+        {/* SETTINGS */}
+        {tab==='settings' && (
+          <div style={{maxWidth:'520px'}}>
+            <div className="section-title">Setup & Settings</div>
+
+            <div style={{marginBottom:'24px'}}>
+              <div style={{fontFamily:'var(--mono)',fontSize:'11px',color:'var(--text-muted)',letterSpacing:'1px',marginBottom:'12px'}}>DEPLOY STEPS</div>
+              {[
+                ['GitHub','Create a free account at github.com, then create a new repo called etsy-manager'],
+                ['Upload Files','Upload index.html, vercel.json, and the api/ folder to your repo'],
+                ['Vercel','Go to vercel.com → New Project → import your GitHub repo → Deploy'],
+                ['Add Env Var','In Vercel project settings → Environment Variables → add ETSY_API_KEY = yspyf6n6947nnvsozogmenvd'],
+                ['Etsy Redirect','In etsy.com/developers → your app → add your Vercel URL as redirect URI'],
+                ['Connect','Come back to this app and click Connect Etsy →'],
+              ].map(([title,desc],i)=>(
+                <div className="step-box" key={i}>
+                  <div className="step-num">{i+1}</div>
+                  <div className="step-content">
+                    <div className="step-title">{title}</div>
+                    <div className="step-desc">{desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="setup-form">
+              <div className="form-group">
+                <label className="form-label">Connection Status</label>
+                <div style={{fontFamily:'var(--mono)',fontSize:'13px',color:isConnected?'var(--green)':'var(--red)',padding:'12px',background:'var(--surface2)',borderRadius:'6px',border:'1px solid var(--border)'}}>
+                  {isConnected ? '✓ Connected to Etsy' : '✗ Not connected'}
+                </div>
+              </div>
+              <div style={{display:'flex',gap:'10px'}}>
+                <button className="btn btn-primary" style={{flex:1}} onClick={startOAuth}>
+                  {isConnected?'Re-connect Etsy':'Connect Etsy →'}
+                </button>
+                {isConnected && (
+                  <button className="btn btn-outline" style={{color:'var(--red)',borderColor:'var(--red)'}}
+                    onClick={()=>{ updateCfg({accessToken:null,refreshToken:null,shopId:null}); setListings([]); showToast('Disconnected'); }}>
+                    Disconnect
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {toast && <div className="toast">{toast}</div>}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
