@@ -129,29 +129,47 @@ function loadCfg() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) 
 function saveCfg(c) { localStorage.setItem(STORAGE_KEY, JSON.stringify(c)); }
 
 async function etsyGet(path, token) {
-  const r = await fetch(`https://openapi.etsy.com/v3${path}`, {
-    headers: { 'Authorization': `Bearer ${token}`, 'x-api-key': ETSY_API_KEY }
-  });
-  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error_description||e.error||`HTTP ${r.status}`); }
-  return r.json();
+  try {
+    const r = await fetch(`https://openapi.etsy.com/v3${path}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'x-api-key': ETSY_API_KEY },
+      mode: 'cors'
+    });
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error_description||e.error||`HTTP ${r.status}`); }
+    return r.json();
+  } catch(err) {
+    console.error('[v0] etsyGet error:', err);
+    throw err;
+  }
 }
 async function etsyPut(path, token, body) {
-  const r = await fetch(`https://openapi.etsy.com/v3${path}`, {
-    method: 'PUT',
-    headers: { 'Authorization': `Bearer ${token}`, 'x-api-key': ETSY_API_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error_description||e.error||`HTTP ${r.status}`); }
-  return r.json();
+  try {
+    const r = await fetch(`https://openapi.etsy.com/v3${path}`, {
+      method: 'PUT',
+      headers: { 'Authorization': `Bearer ${token}`, 'x-api-key': ETSY_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      mode: 'cors'
+    });
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error_description||e.error||`HTTP ${r.status}`); }
+    return r.json();
+  } catch(err) {
+    console.error('[v0] etsyPut error:', err);
+    throw err;
+  }
 }
 async function etsyPost(path, token, body) {
-  const r = await fetch(`https://openapi.etsy.com/v3${path}`, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}`, 'x-api-key': ETSY_API_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error_description||e.error||`HTTP ${r.status}`); }
-  return r.json();
+  try {
+    const r = await fetch(`https://openapi.etsy.com/v3${path}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'x-api-key': ETSY_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      mode: 'cors'
+    });
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error_description||e.error||`HTTP ${r.status}`); }
+    return r.json();
+  } catch(err) {
+    console.error('[v0] etsyPost error:', err);
+    throw err;
+  }
 }
 
 function genVerifier() {
@@ -199,6 +217,7 @@ function App() {
     (async () => {
       try {
         const v = sessionStorage.getItem('pkce_v');
+        if (!v) { console.error('[v0] No PKCE verifier found'); showToast('✗ Session error: restart authentication'); return; }
         const redirect = window.location.origin + window.location.pathname;
         const r = await fetch('/api/token', {
           method: 'POST',
@@ -206,13 +225,14 @@ function App() {
           body: JSON.stringify({ code, code_verifier: v, redirect_uri: redirect })
         });
         const data = await r.json();
+        console.log('[v0] Token response:', { ok: r.ok, hasToken: !!data.access_token, error: data.error });
         if (data.access_token) {
           updateCfg({ accessToken: data.access_token, refreshToken: data.refresh_token });
           sessionStorage.removeItem('pkce_v');
           window.history.replaceState({}, '', window.location.pathname);
           showToast('✓ Connected to Etsy!');
         } else { showToast('✗ Auth failed: ' + (data.error||'unknown')); }
-      } catch(e) { showToast('✗ ' + e.message); }
+      } catch(e) { console.error('[v0] OAuth error:', e); showToast('✗ ' + e.message); }
     })();
   }, []);
 
