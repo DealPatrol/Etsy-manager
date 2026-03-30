@@ -200,7 +200,6 @@ function App() {
     const n = {...cfg,...updates}; saveCfg(n); setCfg(n);
   }
 
-  // OAuth
   async function startOAuth() {
     const v = genVerifier();
     const ch = await genChallenge(v);
