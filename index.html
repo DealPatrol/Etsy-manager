@@ -128,31 +128,34 @@ const ETSY_API_KEY = 'yspyf6n6947nnvsozogmenvd'; // your keystring
 function loadCfg() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; } }
 function saveCfg(c) { localStorage.setItem(STORAGE_KEY, JSON.stringify(c)); }
 
-async function etsyGet(path, token) {
-  const r = await fetch(`https://openapi.etsy.com/v3${path}`, {
-    headers: { 'Authorization': `Bearer ${token}`, 'x-api-key': ETSY_API_KEY }
-  });
-  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error_description||e.error||`HTTP ${r.status}`); }
-  return r.json();
-}
-async function etsyPut(path, token, body) {
-  const r = await fetch(`https://openapi.etsy.com/v3${path}`, {
-    method: 'PUT',
-    headers: { 'Authorization': `Bearer ${token}`, 'x-api-key': ETSY_API_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error_description||e.error||`HTTP ${r.status}`); }
-  return r.json();
-}
-async function etsyPost(path, token, body) {
-  const r = await fetch(`https://openapi.etsy.com/v3${path}`, {
+async function refreshAccessToken(refreshToken) {
+  const r = await fetch('/api/token', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}`, 'x-api-key': ETSY_API_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: refreshToken })
   });
+  const data = await r.json();
+  if (!r.ok || !data.access_token) throw new Error(data.error_description || data.error || 'Token refresh failed');
+  return data; // { access_token, refresh_token }
+}
+
+async function etsyRequest(method, path, token, body, onTokenRefreshed) {
+  const headers = { 'Authorization': `Bearer ${token}`, 'x-api-key': ETSY_API_KEY };
+  if (body) headers['Content-Type'] = 'application/json';
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+  let r = await fetch(`https://openapi.etsy.com/v3${path}`, opts);
+  if (r.status === 401 && onTokenRefreshed) {
+    // Access token expired — let the caller handle the refresh and retry
+    throw Object.assign(new Error('TOKEN_EXPIRED'), { status: 401 });
+  }
   if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error_description||e.error||`HTTP ${r.status}`); }
   return r.json();
 }
+
+async function etsyGet(path, token) { return etsyRequest('GET', path, token, null, true); }
+async function etsyPut(path, token, body) { return etsyRequest('PUT', path, token, body, true); }
+async function etsyPost(path, token, body) { return etsyRequest('POST', path, token, body, true); }
 
 function genVerifier() {
   const a = new Uint8Array(32); crypto.getRandomValues(a);
@@ -180,6 +183,26 @@ function App() {
 
   function updateCfg(updates) {
     const n = {...cfg,...updates}; saveCfg(n); setCfg(n);
+  }
+
+  // Wraps an async fn(token) call: on TOKEN_EXPIRED, refreshes tokens then retries once
+  async function withAutoRefresh(fn) {
+    try {
+      return await fn(cfg.accessToken);
+    } catch(e) {
+      if (e.message !== 'TOKEN_EXPIRED' || !cfg.refreshToken) throw e;
+      try {
+        const tokens = await refreshAccessToken(cfg.refreshToken);
+        updateCfg({ accessToken: tokens.access_token, refreshToken: tokens.refresh_token });
+        return await fn(tokens.access_token);
+      } catch(refreshErr) {
+        // Refresh itself failed — force re-auth
+        updateCfg({ accessToken: null, refreshToken: null, shopId: null });
+        setListings([]);
+        showToast('✗ Session expired — please reconnect Etsy');
+        throw refreshErr;
+      }
+    }
   }
 
   // OAuth
@@ -221,16 +244,18 @@ function App() {
     if (!cfg.accessToken) return;
     setLoading(true);
     try {
-      let sid = cfg.shopId;
-      if (!sid) {
-        const me = await etsyGet('/application/users/me', cfg.accessToken);
-        const shop = await etsyGet(`/application/users/${me.user_id}/shops`, cfg.accessToken);
-        sid = shop.shop_id;
-        updateCfg({ shopId: sid });
-      }
-      const data = await etsyGet(`/application/shops/${sid}/listings/active?limit=100`, cfg.accessToken);
-      setListings(data.results || []);
-    } catch(e) { showToast('✗ ' + e.message); }
+      await withAutoRefresh(async (token) => {
+        let sid = cfg.shopId;
+        if (!sid) {
+          const me = await etsyGet('/application/users/me', token);
+          const shop = await etsyGet(`/application/users/${me.user_id}/shops`, token);
+          sid = shop.shop_id;
+          updateCfg({ shopId: sid });
+        }
+        const data = await etsyGet(`/application/shops/${sid}/listings/active?limit=100`, token);
+        setListings(data.results || []);
+      });
+    } catch(e) { if (e.message !== 'TOKEN_EXPIRED') showToast('✗ ' + e.message); }
     setLoading(false);
   }
 
@@ -242,11 +267,13 @@ function App() {
     const qty = parseInt(editQtys[l.listing_id]);
     if (isNaN(qty)) return;
     try {
-      await etsyPut(`/application/shops/${cfg.shopId}/listings/${l.listing_id}`, cfg.accessToken, { quantity: qty });
+      await withAutoRefresh(async (token) => {
+        await etsyPut(`/application/shops/${cfg.shopId}/listings/${l.listing_id}`, token, { quantity: qty });
+      });
       setListings(p => p.map(x => x.listing_id===l.listing_id ? {...x,quantity:qty} : x));
       setEditQtys(p => { const n={...p}; delete n[l.listing_id]; return n; });
       showToast('✓ Quantity updated');
-    } catch(e) { showToast('✗ '+e.message); }
+    } catch(e) { if (e.message !== 'TOKEN_EXPIRED') showToast('✗ '+e.message); }
   }
 
   function exportCSV() {
@@ -273,18 +300,22 @@ function App() {
     if (!valid.length || !cfg.accessToken || !cfg.shopId) { showToast('Fill in listings and connect Etsy first'); return; }
     setLoading(true);
     let ok=0;
-    for (const row of valid) {
-      try {
-        await etsyPost(`/application/shops/${cfg.shopId}/listings`, cfg.accessToken, {
-          title: row.title, description: row.title,
-          price: parseFloat(row.price), quantity: parseInt(row.qty)||1,
-          who_made:'i_did', when_made:'2020_2024', taxonomy_id:1,
-          is_taxable:true, is_supply:false,
-          ...(row.sku ? {sku:[row.sku]} : {})
-        });
-        ok++;
-      } catch(e) { console.error(row.title, e.message); }
-    }
+    try {
+      await withAutoRefresh(async (token) => {
+        for (const row of valid) {
+          try {
+            await etsyPost(`/application/shops/${cfg.shopId}/listings`, token, {
+              title: row.title, description: row.title,
+              price: parseFloat(row.price), quantity: parseInt(row.qty)||1,
+              who_made:'i_did', when_made:'2020_2024', taxonomy_id:1,
+              is_taxable:true, is_supply:false,
+              ...(row.sku ? {sku:[row.sku]} : {})
+            });
+            ok++;
+          } catch(e) { if (e.message === 'TOKEN_EXPIRED') throw e; console.error(row.title, e.message); }
+        }
+      });
+    } catch(e) { if (e.message !== 'TOKEN_EXPIRED') showToast('✗ '+e.message); }
     setLoading(false);
     setBulkRows([emptyRow()]);
     showToast(`✓ Created ${ok} listing${ok!==1?'s':''}`);
