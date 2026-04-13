@@ -226,7 +226,9 @@ function App() {
         const data = await r.json();
         console.log('[v0] Token response:', { ok: r.ok, hasToken: !!data.access_token, error: data.error });
         if (data.access_token) {
-          updateCfg({ accessToken: data.access_token, refreshToken: data.refresh_token });
+          const n = {...cfg,accessToken:data.access_token,refreshToken:data.refresh_token};
+          saveCfg(n);
+          setCfg(n);
           sessionStorage.removeItem('pkce_v');
           window.history.replaceState({}, '', window.location.pathname);
           showToast('✓ Connected to Etsy!');
