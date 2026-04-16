@@ -147,13 +147,37 @@ function generateListings() {
 
 function App() {
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('etsy_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('etsy_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) { return null; }
   });
   const [authMode, setAuthMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
+
+  // Keep session alive: re-persist user on every render cycle change
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('etsy_user', JSON.stringify(user));
+      localStorage.setItem('etsy_session_ts', Date.now().toString());
+    }
+  }, [user]);
+
+  // On mount: validate stored session is still valid (not expired > 30 days)
+  useEffect(() => {
+    const ts = localStorage.getItem('etsy_session_ts');
+    if (ts) {
+      const age = Date.now() - parseInt(ts, 10);
+      const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+      if (age > thirtyDays) {
+        localStorage.removeItem('etsy_user');
+        localStorage.removeItem('etsy_session_ts');
+        setUser(null);
+      }
+    }
+  }, []);
   const [tab, setTab] = useState('analytics');
   const [cfg, setCfg] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -182,8 +206,11 @@ function App() {
       });
       const data = await r.json();
       if (r.ok && data.user) {
-        localStorage.setItem('etsy_user', JSON.stringify(data.user));
-        setUser(data.user);
+        const userObj = data.user;
+        localStorage.setItem('etsy_user', JSON.stringify(userObj));
+        localStorage.setItem('etsy_session_ts', Date.now().toString());
+        if (data.session) localStorage.setItem('etsy_session_token', data.session);
+        setUser(userObj);
         setEmail('');
         setPassword('');
         showToast('Logged in successfully');
@@ -206,8 +233,11 @@ function App() {
       });
       const data = await r.json();
       if (r.ok && data.user) {
-        localStorage.setItem('etsy_user', JSON.stringify(data.user));
-        setUser(data.user);
+        const userObj = data.user;
+        localStorage.setItem('etsy_user', JSON.stringify(userObj));
+        localStorage.setItem('etsy_session_ts', Date.now().toString());
+        if (data.session) localStorage.setItem('etsy_session_token', data.session);
+        setUser(userObj);
         setEmail('');
         setPassword('');
         showToast('Account created successfully');
@@ -219,7 +249,17 @@ function App() {
   }
 
   function handleLogout() {
+    const token = localStorage.getItem('etsy_session_token');
+    if (token) {
+      fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'logout', sessionToken: token })
+      }).catch(() => {});
+    }
     localStorage.removeItem('etsy_user');
+    localStorage.removeItem('etsy_session_ts');
+    localStorage.removeItem('etsy_session_token');
     setUser(null);
     setCfg({});
     saveCfg({});
