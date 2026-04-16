@@ -193,8 +193,149 @@ function App() {
   const [editQtys, setEditQtys] = useState({});
   const [bulkRows, setBulkRows] = useState([emptyRow()]);
   const [csvText, setCsvText] = useState('');
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('etsy_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [authMode, setAuthMode] = useState('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
 
   function showToast(m) { setToast(m); setTimeout(()=>setToast(''),3500); }
+
+  async function handleLogin() {
+    if (!email || !password) { showToast('✗ Enter email and password'); return; }
+    setAuthLoading(true);
+    try {
+      const r = await fetch('/api/auth', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ mode: 'login', email, password })
+      });
+      const data = await r.json();
+      if (r.ok && data.user) {
+        localStorage.setItem('etsy_user', JSON.stringify(data.user));
+        setUser(data.user);
+        setEmail('');
+        setPassword('');
+        showToast('✓ Logged in!');
+      } else {
+        showToast('✗ ' + (data.error || 'Login failed'));
+      }
+    } catch(e) { showToast('✗ ' + e.message); }
+    setAuthLoading(false);
+  }
+
+  async function handleSignup() {
+    if (!email || !password) { showToast('✗ Enter email and password'); return; }
+    if (password.length < 6) { showToast('✗ Password must be 6+ characters'); return; }
+    setAuthLoading(true);
+    try {
+      const r = await fetch('/api/auth', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ mode: 'signup', email, password })
+      });
+      const data = await r.json();
+      if (r.ok && data.user) {
+        localStorage.setItem('etsy_user', JSON.stringify(data.user));
+        setUser(data.user);
+        setEmail('');
+        setPassword('');
+        showToast('✓ Account created!');
+      } else {
+        showToast('✗ ' + (data.error || 'Signup failed'));
+      }
+    } catch(e) { showToast('✗ ' + e.message); }
+    setAuthLoading(false);
+  }
+
+  function handleLogout() {
+    localStorage.removeItem('etsy_user');
+    setUser(null);
+    setCfg({});
+    saveCfg({});
+    showToast('✓ Logged out');
+  }
+
+  if (!user) {
+    return (
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', padding:'20px' }}>
+        <div style={{ width:'100%', maxWidth:'400px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'12px', padding:'32px' }}>
+          <div style={{ textAlign:'center', marginBottom:'32px' }}>
+            <div style={{ fontSize:'24px', fontWeight:800, marginBottom:'8px' }}>Etsy Manager Pro</div>
+            <div style={{ fontSize:'13px', color:'var(--text-muted)' }}>Manage your listings at scale</div>
+          </div>
+          
+          <div style={{ display:'flex', gap:'8px', marginBottom:'24px' }}>
+            <button 
+              onClick={() => setAuthMode('login')}
+              style={{ 
+                flex:1, padding:'12px', borderRadius:'6px', border:'none', fontWeight:700, fontSize:'13px',
+                background: authMode==='login' ? 'var(--etsy)' : 'var(--surface2)', color: authMode==='login' ? 'white' : 'var(--text)',
+                cursor:'pointer', transition:'all 0.15s'
+              }}
+            >
+              SIGN IN
+            </button>
+            <button 
+              onClick={() => setAuthMode('signup')}
+              style={{ 
+                flex:1, padding:'12px', borderRadius:'6px', border:'none', fontWeight:700, fontSize:'13px',
+                background: authMode==='signup' ? 'var(--etsy)' : 'var(--surface2)', color: authMode==='signup' ? 'white' : 'var(--text)',
+                cursor:'pointer', transition:'all 0.15s'
+              }}
+            >
+              SIGN UP
+            </button>
+          </div>
+
+          <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyPress={(e) => e.key==='Enter' && (authMode==='login' ? handleLogin() : handleSignup())}
+              style={{
+                padding:'12px 14px', borderRadius:'6px', border:'1px solid var(--border)', background:'var(--surface2)',
+                color:'var(--text)', fontFamily:'var(--mono)', fontSize:'13px', outline:'none', transition:'border-color 0.15s'
+              }}
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyPress={(e) => e.key==='Enter' && (authMode==='login' ? handleLogin() : handleSignup())}
+              style={{
+                padding:'12px 14px', borderRadius:'6px', border:'1px solid var(--border)', background:'var(--surface2)',
+                color:'var(--text)', fontFamily:'var(--mono)', fontSize:'13px', outline:'none', transition:'border-color 0.15s'
+              }}
+            />
+            <button
+              onClick={() => authMode==='login' ? handleLogin() : handleSignup()}
+              disabled={authLoading}
+              style={{
+                padding:'12px 18px', borderRadius:'6px', border:'none', background:'var(--etsy)', color:'white',
+                fontFamily:'var(--sans)', fontWeight:700, fontSize:'13px', cursor: authLoading ? 'not-allowed' : 'pointer',
+                opacity: authLoading ? 0.6 : 1, transition:'all 0.15s', textTransform:'uppercase'
+              }}
+            >
+              {authLoading ? 'Loading...' : (authMode==='login' ? 'Sign In' : 'Create Account')}
+            </button>
+          </div>
+
+          {authMode==='signup' && (
+            <div style={{ fontSize:'11px', color:'var(--text-muted)', marginTop:'16px', textAlign:'center' }}>
+              Password must be at least 6 characters
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   function updateCfg(updates) {
     const n = {...cfg,...updates}; saveCfg(n); setCfg(n);
@@ -328,9 +469,11 @@ function App() {
       <header className="header">
         <div className="logo"><span className="logo-badge">ETSY</span> Manager Pro</div>
         <div className="header-right">
+          <span style={{ fontSize:'12px', color:'var(--text-muted)' }}>{user?.email}</span>
           {isConnected && <div className="status-dot"/>}
           <span className="status-text">{isConnected?'CONNECTED':'NOT CONNECTED'}</span>
           {!isConnected && <button className="btn btn-primary btn-sm" onClick={startOAuth}>Connect Etsy →</button>}
+          <button className="btn" style={{ padding:'8px 14px', fontSize:'11px', background:'var(--surface2)', color:'var(--text)', border:'1px solid var(--border)', cursor:'pointer', borderRadius:'4px' }} onClick={handleLogout}>Logout</button>
         </div>
       </header>
 
