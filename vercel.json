@@ -1,15 +1,50 @@
 {
+  "env": [
+    "ETSY_API_KEYSTRING",
+    "ETSY_SHARED_SECRET",
+    "ETSY_REDIRECT_URI"
+  ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
     {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "X-XSS-Protection", "value": "1; mode=block" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    },
+    {
       "source": "/index.html",
       "headers": [
         { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" }
+        { "key": "Pragma", "value": "no-cache" },
+        { "key": "Expires", "value": "0" }
+      ]
+    },
+    {
+      "source": "/api/auth",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate, proxy-revalidate" }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "max-age=300" }
       ]
     }
-  ]
+  ],
+  "functions": {
+    "api/**/*.js": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  },
+  "buildCommand": "echo 'Static build - no build step required'"
 }
+
